@@ -11,8 +11,7 @@
                                             no-data-text="No available addresses"
                                             outlined
                                             :items="addresses"
-                                            item-text="display_name"
-                                            item-value="place_id"
+                                            return-object
                                             :loading="loading"
                                             clearable
                                             @update:search-input="getAddresses($event)"
@@ -74,11 +73,11 @@ import debounce from 'debounce';
             getAddresses: debounce(function (term) {
                 if(term !== null) {
                 this.term = term.split(' ').join('+');
-                console.log(this.term);
                 this.loading = true;
-                this.$http.get('https://nominatim.openstreetmap.org/search/?street=' + this.term + '&country=south+africa&format=json').then(
+                // this.$http.get('https://nominatim.openstreetmap.org/search/?street=' + this.term + '&country=south+africa&format=json').then(
+                this.$http.get('https://gis.telkom.co.za/locators/rest/services/Telkom_Composite/GeocodeServer/suggest?f=json&text='+this.term+'&maxSuggestions=10').then(
                     (resp) => {
-                        this.addresses = resp.data;
+                        this.addresses = resp.data.suggestions;
                         this.loading = false;
                     },
                     (err) => {
@@ -90,12 +89,13 @@ import debounce from 'debounce';
                 }
             }, 1000),
             check() {
-                this.$http.post('api/v1', this.selectedAddress).then(
+                this.$http.post('http://localhost:5000/api/v1', JSON.stringify(this.selectedAddress)).then(
                     (resp) => {
                         console.log(resp);
                     },
                     (err) => {
                         console.log(err);
+                        this.hasError = true;
                     }
                 );
             },
