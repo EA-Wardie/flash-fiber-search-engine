@@ -90,7 +90,14 @@ import debounce from 'debounce';
                 }
             }, 1000),
             check() {
-
+                this.$http.post('api/v1', this.selectedAddress).then(
+                    (resp) => {
+                        console.log(resp);
+                    },
+                    (err) => {
+                        console.log(err);
+                    }
+                );
             },
             refresh() {
                 this.loadingError = true;
