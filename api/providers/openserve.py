@@ -1,94 +1,87 @@
 import json
-import urllib3
+
+import handler
 
 
 class OpenServe:
     def __init__(self):
-        self.http = urllib3.PoolManager()
         self.url = 'https://gis.telkom.co.za'
-        self.findaddress = '/locators/rest/services/Telkom_Composite/GeocodeServer/findAddressCandidates'
         self.techapiv2 = '/apps/api/ucmTechAPIV2'
 
-    def geocoding(self, data):
-        headers = {'Host': 'gis.telkom.co.za',
-                   'Referer': 'https://openserve.co.za/opencoveragemap/support/check-coverage',
-                   'Origin': 'https://openserve.co.za'}
+        self.headers = {'Host': 'gis.telkom.co.za',
+                        'Referer': 'https://openserve.co.za/opencoveragemap/support/check-coverage',
+                        'Origin': 'https://openserve.co.za'}
 
-        text = data.get('text')
-        magic_key = data.get('magicKey')
-
-        if text and magic_key:
-            fields = {'SingleLine': text,
-                      'f': 'json',
-                      # 'outFields': 'Match_addr,Loc_name,Addr_type,AddNum,StAddr,StName,'
-                      # 'StType,Nbrhd,City,Region,Postal,Country',
-                      'magicKey': magic_key,
-                      'maxLocations': 1}
-
-            return self.http.request('GET', self.url + self.findaddress, headers=headers, fields=fields)
-        else:
-            return 400
-
-    def services_available(self, address, latitude, longitude):
-        headers = {'Host': 'gis.telkom.co.za',
-                   'Referer': 'https://openserve.co.za/opencoveragemap/support/check-coverage',
-                   'Origin': 'https://openserve.co.za'}
-
-        fields = {'LAT': latitude,
+    async def fetch_services(self, session, address, latitude, longitude):
+        params = {'LAT': latitude,
                   'LON': longitude,
                   'ADDRESS': address,
                   'GCACCURACY': 'ROOFTOP'}
 
-        result = self.http.request('GET', self.url + self.techapiv2, headers=headers, fields=fields)
+        result, status = await handler.myrequest(session, 'GET', self.url + self.techapiv2,
+                                                 params=params, headers=self.headers)
 
-        if result.status == 200:
+        if status == 200:
             try:
-                data = json.loads(result.data.decode('utf-8'))
-                verified = data.get('AddressVerify')[0]
+                result = json.loads(result)
             except json.JSONDecodeError:
-                return 400
+                return {'event': 'error', 'msg': 'invalid json'}
             else:
-                if verified:
-                    latitude = verified.get('LR_LAT')
-                    longitude = verified.get('LR_LON')
-                    address = verified.get('LR_Address')
-                    amid = verified.get('AMID')
+                if 'AddressVerify' in result:
+                    verified = result.get('AddressVerify').pop(0)
 
-                    fields = {'LAT': latitude,
-                              'LON': longitude,
-                              'ADDRESS': address,
-                              'AMID': amid,
-                              'GCACCURACY': 'VERIFIED'}
+                    if verified:
+                        latitude = verified.get('LR_LAT')
+                        longitude = verified.get('LR_LON')
+                        address = verified.get('LR_Address')
+                        amid = verified.get('AMID')
 
-                    result = self.http.request('GET', self.url + self.techapiv2, headers=headers, fields=fields)
+                        params = {'LAT': latitude,
+                                  'LON': longitude,
+                                  'ADDRESS': address,
+                                  'AMID': amid,
+                                  'GCACCURACY': 'VERIFIED'}
 
-                    if result.status == 200:
-                        try:
-                            data = json.loads(result.data.decode('utf-8'))
-                        except json.JSONDecodeError:
-                            return 400
-                        else:
-                            if data.get('errorCode') == 0:
-                                payload = data.get('results').get('items')[0].get('payload')
+                        result, status = await handler.myrequest(session, 'GET', self.url + self.techapiv2,
+                                                                 params=params, headers=self.headers)
 
-                                response = {'id': 0,
-                                            'company': 'Openserve',
-                                            'logo': 'https://openserve.co.za/open/assets/_images/openserve_logo.svg',
-                                            'ftth': 0,
-                                            'status': ''}
-
-                                if payload:
-                                    ftth = payload.get('FTTHBoundary')
-                                    status = payload.get('ftthInfrastructure').get('ftthInfo')[0].get('FTTH_Status')
-
-                                    response['ftth'] = ftth
-                                    response['status'] = status
-
-                                    return response
-                                else:
-                                    return 400
+                        if status == 200:
+                            try:
+                                result = json.loads(result)
+                            except json.JSONDecodeError:
+                                return {'event': 'error', 'msg': 'invalid json'}
                             else:
-                                return 400
+                                if 'errorCode' in result:
+                                    if result.get('errorCode') == 0:
+                                        items = result.get('results').get('items').pop(0)
+                                        if 'payload' in items:
+                                            payload = items['payload']
 
+                                            response = {'id': 0,
+                                                        'company': 'Openserve',
+                                                        'logo': 'https://openserve.co.za/open/assets/_images/'
+                                                                'openserve_logo.svg',
+                                                        'ftth': 'Unknown',
+                                                        'status': 'Unknown'}
+
+                                            if 'FTTHBoundary' in payload:
+                                                ftth = payload.get('FTTHBoundary')
+                                                response['ftth'] = ftth
+
+                                            if 'ftthInfo' in payload.get('ftthInfrastructure'):
+                                                ftth_info = payload.get('ftthInfrastructure').get('ftthInfo').pop(0)
+                                                if 'FTTH_Status' in ftth_info:
+                                                    status = ftth_info.get('FTTH_Status')
+                                                    response['status'] = status
+
+                                            return response
+
+                                else:
+                                    return {'event': 'error', 'msg': 'incomplete response'}
+                        else:
+                            return {'event': 'error', 'msg': 'unknown error', 'code': status}
+
+                else:
+                    return {'event': 'error', 'msg': 'incomplete response'}
         else:
-            return result.status
+            return {'event': 'error', 'msg': 'unknown error', 'code': status}

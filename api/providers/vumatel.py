@@ -1,4 +1,3 @@
-import urllib3
 import json
 
 # http = urllib3.PoolManager()
