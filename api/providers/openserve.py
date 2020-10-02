@@ -68,7 +68,7 @@ class OpenServe:
                                                 ftth = payload.get('FTTHBoundary')
                                                 response['ftth'] = ftth
 
-                                            if 'ftthInfo' in payload.get('ftthInfrastructure'):
+                                            if 'ftthInfrastructure' in payload:
                                                 ftth_info = payload.get('ftthInfrastructure').get('ftthInfo').pop(0)
                                                 if 'FTTH_Status' in ftth_info:
                                                     status = ftth_info.get('FTTH_Status')
