@@ -70,7 +70,6 @@ class OpenServe:
                         else:
                             if data.get('errorCode') == 0:
                                 payload = data.get('results').get('items')[0].get('payload')
-
                                 response = {'id': 0,
                                             'company': 'Openserve',
                                             'logo': 'https://openserve.co.za/open/assets/_images/openserve_logo.svg',
