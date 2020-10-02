@@ -40,6 +40,6 @@ class Geocoding:
 
                     return {'event': 'error', 'msg': 'invalid response'}
             else:
-                return {'event': 'error', 'msg': 'unknown error', 'code': status}
+                return {'event': 'error', 'msg': 'geolocation error', 'code': status}
         else:
             return {'event': 'error', 'msg': 'invalid request'}

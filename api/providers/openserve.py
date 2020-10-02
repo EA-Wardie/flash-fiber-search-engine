@@ -12,6 +12,29 @@ class OpenServe:
                         'Referer': 'https://openserve.co.za/opencoveragemap/support/check-coverage',
                         'Origin': 'https://openserve.co.za'}
 
+    def decode_json(self, data):
+        ftth = 'No'
+        status = 'Unknown'
+        if 'results' in data:
+            results = data['results']['items']
+            for result in results:
+                if 'payload' in result:
+                    payload = result['payload']
+                    for item in payload:
+                        if 'FTTHBoundary' in item:
+                            ftth = payload[item]
+
+                        if 'ftthInfrastructure' in item:
+                            infrastructure = payload[item]
+                            for status in infrastructure:
+                                if 'ftthInfo' in status:
+                                    ftth_info = infrastructure[status]
+                                    for keys in ftth_info:
+                                        for key in keys:
+                                            if 'FTTH_Status' in key:
+                                                status = keys[key]
+        return ftth, status
+
     async def fetch_services(self, session, address, latitude, longitude):
         params = {'LAT': latitude,
                   'LON': longitude,
@@ -51,37 +74,18 @@ class OpenServe:
                             except json.JSONDecodeError:
                                 return {'event': 'error', 'msg': 'invalid json'}
                             else:
-                                if 'errorCode' in result:
-                                    if result.get('errorCode') == 0:
-                                        items = result.get('results').get('items').pop(0)
-                                        if 'payload' in items:
-                                            payload = items['payload']
+                                ftth, status = self.decode_json(result)
 
-                                            response = {'id': 0,
-                                                        'company': 'Openserve',
-                                                        'logo': 'https://openserve.co.za/open/assets/_images/'
-                                                                'openserve_logo.svg',
-                                                        'ftth': 'Unknown',
-                                                        'status': 'Unknown'}
+                                response = {'company': 'Openserve',
+                                            'logo': 'https://openserve.co.za/open/assets/_images/'
+                                                    'openserve_logo.svg',
+                                            'ftth': ftth,
+                                            'status': status}
 
-                                            if 'FTTHBoundary' in payload:
-                                                ftth = payload.get('FTTHBoundary')
-                                                response['ftth'] = ftth
+                                return response
 
-                                            if 'ftthInfrastructure' in payload:
-                                                ftth_info = payload.get('ftthInfrastructure').get('ftthInfo').pop(0)
-                                                if 'FTTH_Status' in ftth_info:
-                                                    status = ftth_info.get('FTTH_Status')
-                                                    response['status'] = status
-
-                                            return response
-
-                                else:
-                                    return {'event': 'error', 'msg': 'incomplete response'}
                         else:
-                            return {'event': 'error', 'msg': 'unknown error', 'code': status}
+                            return {'event': 'error', 'msg': 'geolocation error', 'code': status}
 
-                else:
-                    return {'event': 'error', 'msg': 'incomplete response'}
         else:
-            return {'event': 'error', 'msg': 'unknown error', 'code': status}
+            return {'event': 'error', 'msg': 'geolocation error', 'code': status}

@@ -1,4 +1,5 @@
 import json
+import time
 
 import aiohttp
 
@@ -25,6 +26,8 @@ class MessageHandler:
                 response = {'event': 'response', 'providers': []}
 
                 response['providers'].append(await openserve.fetch_services(session, address, latitude, longitude))
+
+            time.sleep(0.1)
 
         except json.JSONDecodeError:
             return {'event': 'error', 'msg': 'invalid json'}
